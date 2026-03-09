@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GTD Internal · Sales Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:#080f1a}
+body{font-family:'DM Sans',sans-serif;color:#e2e8f0}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#1a3050;border-radius:2px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeUp{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* PASSWORD */
+#pw-screen{position:fixed;inset:0;background:#080f1a;display:flex;align-items:center;justify-content:center;z-index:999}
+.pw-card{background:#0f1c2e;border:1px solid #1a3050;border-radius:16px;padding:44px 48px;width:360px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.pw-logo{width:52px;height:52px;background:linear-gradient(135deg,#1d4ed8,#0891b2);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 18px}
+.pw-title{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#e2e8f0;margin-bottom:6px}
+.pw-sub{font-size:10px;font-family:monospace;color:#3d5f7a;letter-spacing:.1em;text-transform:uppercase;margin-bottom:30px}
+.pw-input{width:100%;background:#071020;border:1px solid #1a3050;border-radius:8px;padding:12px 16px;color:#e2e8f0;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:10px;transition:border-color .2s;letter-spacing:.1em}
+.pw-input:focus{border-color:#1d4ed8}
+.pw-input::placeholder{color:#2d4a62;letter-spacing:0}
+.pw-btn{width:100%;padding:12px;background:linear-gradient(135deg,#1d4ed8,#0891b2);border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity .2s;margin-top:4px}
+.pw-btn:hover{opacity:.85}
+.pw-err{font-size:11px;color:#f87171;font-family:monospace;margin-top:10px;display:none}
+
+/* LOADING */
+#loading-screen{position:fixed;inset:0;background:#080f1a;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:998}
+.spinner{width:32px;height:32px;border:3px solid #1a3050;border-top-color:#38bdf8;border-radius:50%;animation:spin 0.8s linear infinite}
+
+/* DASHBOARD */
+#app{display:none}
+.topbar{background:#0a1525;border-bottom:1px solid #1a3050;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+.brand-logo{width:30px;height:30px;background:linear-gradient(135deg,#1d4ed8,#0891b2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.brand-name{font-family:'Syne',sans-serif;font-weight:800;font-size:15px}
+.brand-sub{font-size:9px;font-family:monospace;color:#2d4a62;letter-spacing:.1em}
+.live-badge{display:flex;align-items:center;gap:6px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);border-radius:20px;padding:3px 10px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 7px #34d399;animation:pulse 2s infinite}
+.live-text{font-size:9px;font-family:monospace;color:#34d399}
+.refresh-btn{background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 10px;color:#38bdf8;font-family:monospace;font-size:9px;cursor:pointer}
+.sync-time{font-size:9px;font-family:monospace;color:#2d4a62}
+
+.main{padding:12px 14px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:2fr 2fr 1.4fr;gap:10px;margin-bottom:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.g3b{display:grid;grid-template-columns:1.5fr 2fr 1.5fr;gap:10px;margin-bottom:10px}
+.panel{background:#0f1c2e;border:1px solid #1a3050;border-radius:10px;padding:14px 16px;transition:border-color .2s}
+.panel:hover{border-color:rgba(29,78,216,.35)}
+.lbl{font-size:9px;font-family:monospace;color:#3d5f7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.kpi-card{background:#0f1c2e;border:1px solid #1a3050;border-radius:10px;padding:14px 16px;transition:all .2s;animation:fadeUp .5s ease both}
+.kpi-card:hover{transform:translateY(-2px)}
+.kpi-lbl{font-size:9px;font-family:monospace;color:#3d5f7a;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:26px;line-height:1;margin-bottom:4px}
+.kpi-sub{font-size:10px;font-family:monospace;color:#4a6f8a}
+.delta-up{font-size:10px;font-family:monospace;color:#34d399;background:rgba(52,211,153,.1);padding:1px 6px;border-radius:4px;margin-left:5px}
+.delta-dn{font-size:10px;font-family:monospace;color:#f87171;background:rgba(248,113,113,.1);padding:1px 6px;border-radius:4px;margin-left:5px}
+.spark-wrap{margin-top:8px;height:44px;position:relative}
+.spark-wrap canvas{position:absolute;inset:0}
+.funnel-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.funnel-lbl{width:96px;font-size:10px;color:#64748b;text-align:right;font-family:monospace;flex-shrink:0}
+.funnel-track{flex:1;height:16px;background:#071020;border-radius:3px;overflow:hidden}
+.funnel-fill{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;transition:width 1.2s ease}
+.funnel-pct{font-size:9px;color:rgba(255,255,255,.75);font-family:monospace}
+.funnel-count{width:30px;font-size:11px;font-family:monospace;color:#94a3b8;text-align:right;flex-shrink:0}
+.funnel-stats{display:flex;gap:16px;padding:8px 10px;background:#071020;border-radius:6px;margin-top:6px;font-size:10px;font-family:monospace;flex-wrap:wrap}
+.prog-item{margin-bottom:10px}
+.prog-header{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px}
+.prog-track{height:6px;background:#0b1623;border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;transition:width 1.2s ease}
+table{width:100%;border-collapse:collapse}
+th{font-size:9px;font-family:monospace;color:#2d4a62;text-transform:uppercase;letter-spacing:.06em;padding:5px 8px;border-bottom:1px solid #0f1c2e;text-align:left;font-weight:400}
+td{padding:7px 8px;font-size:11px;border-bottom:1px solid #0b1623}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.015)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mini-card{background:#071020;border-radius:6px;padding:7px 10px}
+.mini-card-lbl{font-size:8px;font-family:monospace;color:#2d4a62;margin-bottom:2px}
+.mini-card-val{font-family:'Syne',sans-serif;font-weight:700;font-size:15px}
+.footer{padding:8px 16px 14px;display:flex;justify-content:space-between;font-size:9px;font-family:monospace;color:#1e3a5f;border-top:1px solid #0f1c2e;margin-top:8px}
+.summary-status{display:flex;align-items:center;gap:6px;background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:6px;padding:5px 10px;margin-bottom:10px}
+.summary-body{font-size:11px;line-height:1.75;color:#7a9ab5}
+.summary-body strong{color:#22d3ee}
+.summary-divider{border-top:1px solid #1a3050;margin:8px 0}
+.error-box{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:11px;color:#f87171;margin:16px}
+@media(max-width:900px){.g5{grid-template-columns:1fr 1fr}.g3,.g3b{grid-template-columns:1fr}.g4{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- PASSWORD -->
+<div id="pw-screen">
+  <div class="pw-card" id="pw-card">
+    <div class="pw-logo">📊</div>
+    <div class="pw-title">GTD Internal</div>
+    <div class="pw-sub">Sales & Marketing Dashboard · Q1 FY2026</div>
+    <input class="pw-input" type="password" id="pw-input" placeholder="Enter password" autocomplete="current-password"/>
+    <div class="pw-err" id="pw-err">⚠ Incorrect password</div>
+    <button class="pw-btn" id="pw-btn">Unlock Dashboard</button>
+    <div style="margin-top:16px;font-size:9px;font-family:monospace;color:#1e3a5f">GTD INTERNAL · CONFIDENTIAL</div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="brand-logo" style="width:48px;height:48px;font-size:22px;border-radius:12px">📊</div>
+  <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#38bdf8">GTD Internal</div>
+  <div class="spinner"></div>
+  <div style="font-family:monospace;font-size:11px;color:#3d5f7a">Fetching live data from Google Sheets…</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="brand-logo">📊</div>
+      <div>
+        <div class="brand-name">GTD Internal</div>
+        <div class="brand-sub">SALES & MARKETING PIPELINE · Q1 FY2026</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="sync-time" id="sync-time"></span>
+      <button class="refresh-btn" onclick="loadData()">↺ Refresh</button>
+      <div class="live-badge"><div class="live-dot"></div><span class="live-text">LIVE · Sheets</span></div>
+    </div>
+  </div>
+
+  <div id="error-area"></div>
+
+  <div class="main">
+    <div class="g5" id="kpi-row"></div>
+    <div class="g3">
+      <div class="panel">
+        <div class="lbl">Sales & Marketing Funnel</div>
+        <div id="funnel-rows"></div>
+        <div class="funnel-stats" id="funnel-stats"></div>
+      </div>
+      <div class="panel">
+        <div class="lbl" id="cash-lbl">Cash Collected vs Target</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
+          <div>
+            <div id="cash-big" style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#fbbf24;line-height:1"></div>
+            <div id="cash-sub" style="font-size:10px;font-family:monospace;color:#4a6f8a;margin-top:3px"></div>
+          </div>
+          <div style="font-size:10px;font-family:monospace">
+            <span style="color:#fbbf24">— Cumulative</span>
+            <span style="color:#1d4ed8;margin-left:10px">▐ Daily</span>
+          </div>
+        </div>
+        <div style="position:relative;height:155px"><canvas id="chart-cash"></canvas></div>
+      </div>
+      <div class="panel" style="overflow-y:auto;max-height:320px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:14px">✦</span>
+          <div class="lbl" style="margin-bottom:0">Pipeline Summary</div>
+        </div>
+        <div class="summary-status">
+          <span style="font-size:8px;color:#34d399">●</span>
+          <span style="font-size:10px;font-family:monospace;color:#34d399">Live · Auto-refresh every 5 min</span>
+        </div>
+        <div class="summary-body" id="summary-body"></div>
+      </div>
+    </div>
+    <div class="g4" id="conv-row"></div>
+    <div class="g3b">
+      <div class="panel">
+        <div class="lbl" id="targets-lbl">vs Monthly Targets</div>
+        <div id="targets-row"></div>
+      </div>
+      <div class="panel">
+        <div class="lbl" id="daily-lbl">Daily Leads & Ad Spend</div>
+        <div style="position:relative;height:185px"><canvas id="chart-daily"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="lbl" id="weekly-lbl">Weekly Breakdown</div>
+        <table>
+          <thead><tr><th>Week</th><th>Leads</th><th>Spend</th><th>Cash</th><th>Sales</th></tr></thead>
+          <tbody id="weekly-body"></tbody>
+        </table>
+        <div id="cur-month-section" style="display:none;border-top:1px solid #1a3050;margin-top:10px;padding-top:10px">
+          <div class="lbl" id="cur-month-lbl" style="margin-bottom:6px"></div>
+          <div class="mini-grid" id="cur-mini"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>GTD INTERNAL · CONFIDENTIAL</span>
+    <span id="footer-source">Live data · Google Sheets</span>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// PASSWORD
+// ════════════════════════════════════════════════════
+const SECRET = "GTD2026";
+let chartCash = null, chartDaily = null, sparkCharts = {};
+
+const pwInput = document.getElementById("pw-input");
+const pwErr   = document.getElementById("pw-err");
+const pwCard  = document.getElementById("pw-card");
+
+function tryUnlock() {
+  if (pwInput.value === SECRET) {
+    document.getElementById("pw-screen").style.display = "none";
+    document.getElementById("loading-screen").style.display = "flex";
+    loadData();
+  } else {
+    pwErr.style.display = "block";
+    pwCard.style.animation = "shake 0.4s ease";
+    setTimeout(() => { pwCard.style.animation = ""; }, 400);
+    pwInput.value = "";
+    pwInput.focus();
+  }
+}
+document.getElementById("pw-btn").addEventListener("click", tryUnlock);
+pwInput.addEventListener("keydown", e => { if (e.key === "Enter") tryUnlock(); });
+
+// ════════════════════════════════════════════════════
+// DATA FETCHING
+// ════════════════════════════════════════════════════
+const PREV = { leads:138, spend:33200, mtg:58, sql:96, su:8, cash:198000, feR:105000 };
+const DEFAULT_TARGETS = { cash:250000, leads:155, mtg:69, su:10, feR:125000, spend:35786 };
+
+let TARGETS = { ...DEFAULT_TARGETS };
+let RAW = [], CUR_MONTH_ROWS = [], MAIN_ROWS = [];
+let MAIN_MONTH = "Feb", CUR_MONTH = "Mar";
+
+async function loadData() {
+  try {
+    const res  = await fetch("/.netlify/functions/sheets");
+    const json = await res.json();
+
+    if (json.error) throw new Error(json.error);
+
+    parseSheetData(json.daily || [], json.targets || []);
+    document.getElementById("loading-screen").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("sync-time").textContent = "Synced " + new Date().toLocaleTimeString();
+    document.getElementById("error-area").innerHTML = "";
+    buildDashboard();
+
+    // Auto-refresh every 5 minutes
+    setTimeout(loadData, 5 * 60 * 1000);
+
+  } catch(err) {
+    document.getElementById("loading-screen").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    document.getElementById("error-area").innerHTML =
+      `<div class="error-box">⚠ Could not fetch live data: ${err.message} — showing cached data if available.</div>`;
+    if (RAW.length === 0) loadFallbackData();
+    else buildDashboard();
+  }
+}
+
+// ── Column indices (0-based) matching your sheet layout
+// Month|Quarter|Week|DayOfWeek|Date|TotalLeads|Adspend|MeetingsBooked|SQLs|SMDone|SalesUnits|FERevenue|FECash|TotalClients|Upsells|BERevenue|BECash|CashCollected
+const COL = { date:4, leads:5, spend:6, mtg:7, sql:8, sm:9, su:10, feR:11, cash:17 };
+
+const MONTHS = {"01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun","07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec"};
+
+function n(v) { const x = parseFloat(String(v||"").replace(/[$,\s]/g,"")); return isNaN(x)?0:x; }
+
+function parseDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})/);
+  if (m) return `${String(m[1]).padStart(2,"0")}-${String(m[2]).padStart(2,"0")}`;
+  return null;
+}
+
+function parseSheetData(rows, tRows) {
+  // Find header row
+  let startIdx = 5;
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    if (rows[i].some(c => /total.leads|meetings.booked/i.test(String(c)))) {
+      startIdx = i + 1; break;
+    }
+  }
+
+  const parsed = [];
+  for (let i = startIdx; i < rows.length; i++) {
+    const r = rows[i];
+    const d = parseDate(r[COL.date]);
+    if (!d) continue;
+    const leadsVal = n(r[COL.leads]);
+    if (leadsVal === 0 && n(r[COL.spend]) === 0 && n(r[COL.cash]) === 0) continue;
+    if (leadsVal > 5000) continue;
+    parsed.push({ d, leads:leadsVal, spend:n(r[COL.spend]), mtg:n(r[COL.mtg]),
+      sql:n(r[COL.sql]), sm:n(r[COL.sm]), su:n(r[COL.su]), feR:n(r[COL.feR]), cash:n(r[COL.cash]) });
+  }
+
+  if (parsed.length === 0) { loadFallbackData(); return; }
+  RAW = parsed;
+
+  // Detect months
+  const months = [...new Set(RAW.map(r => r.d.split("-")[0]))].sort();
+  const latestMo = months[months.length - 1];
+  const prevMo   = months.length > 1 ? months[months.length - 2] : latestMo;
+  const isMulti  = months.length > 1;
+
+  MAIN_ROWS      = isMulti ? RAW.filter(r => r.d.startsWith(prevMo))   : RAW;
+  CUR_MONTH_ROWS = isMulti ? RAW.filter(r => r.d.startsWith(latestMo)) : [];
+  MAIN_MONTH     = MONTHS[prevMo]   || prevMo;
+  CUR_MONTH      = MONTHS[latestMo] || latestMo;
+
+  // Parse targets tab
+  const tMap = {};
+  tRows.forEach(r => {
+    const lbl = String(r[0]||"").toLowerCase();
+    const val = n(r[1])||n(r[2])||n(r[3]);
+    if (/total.leads|^leads/i.test(lbl) && !tMap.leads) tMap.leads = val;
+    if (/meetings/i.test(lbl) && !tMap.mtg)             tMap.mtg   = val;
+    if (/sales.unit/i.test(lbl) && !tMap.su)            tMap.su    = val;
+    if (/fe.rev/i.test(lbl) && !tMap.feR)               tMap.feR   = val;
+    if (/cash.collect/i.test(lbl) && !tMap.cash)        tMap.cash  = val;
+    if (/adspend|ad.spend/i.test(lbl) && !tMap.spend)   tMap.spend = val;
+  });
+  TARGETS = { ...DEFAULT_TARGETS, ...Object.fromEntries(Object.entries(tMap).filter(([,v])=>v>0)) };
+}
+
+function loadFallbackData() {
+  // Hardcoded Feb data as fallback
+  RAW = [
+    {d:"02-01",leads:4,spend:675,mtg:1,sql:1,sm:0,su:0,feR:0,cash:0},
+    {d:"02-02",leads:9,spend:1032,mtg:3,sql:3,sm:4,su:0,feR:0,cash:0},
+    {d:"02-03",leads:10,spend:1669,mtg:5,sql:5,sm:4,su:1,feR:25000,cash:9500},
+    {d:"02-04",leads:11,spend:1129,mtg:4,sql:4,sm:2,su:1,feR:2000,cash:6000},
+    {d:"02-05",leads:11,spend:1304,mtg:6,sql:6,sm:0,su:0,feR:0,cash:19000},
+    {d:"02-06",leads:15,spend:1355,mtg:9,sql:9,sm:4,su:0,feR:0,cash:10000},
+    {d:"02-07",leads:8,spend:1361,mtg:3,sql:3,sm:0,su:0,feR:0,cash:4000},
+    {d:"02-08",leads:10,spend:1439,mtg:4,sql:4,sm:0,su:0,feR:0,cash:6000},
+    {d:"02-09",leads:16,spend:1717,mtg:9,sql:9,sm:4,su:0,feR:0,cash:0},
+    {d:"02-10",leads:5,spend:1585,mtg:6,sql:6,sm:4,su:0,feR:0,cash:3000},
+    {d:"02-11",leads:17,spend:1856,mtg:9,sql:9,sm:5,su:1,feR:10800,cash:5100},
+    {d:"02-12",leads:19,spend:1809,mtg:8,sql:8,sm:5,su:0,feR:0,cash:5000},
+    {d:"02-13",leads:14,spend:1774,mtg:4,sql:4,sm:4,su:1,feR:9800,cash:9800},
+    {d:"02-14",leads:14,spend:1734,mtg:1,sql:1,sm:0,su:0,feR:0,cash:0},
+    {d:"02-15",leads:4,spend:1732,mtg:2,sql:2,sm:0,su:0,feR:0,cash:0},
+    {d:"02-16",leads:8,spend:1736,mtg:8,sql:8,sm:0,su:0,feR:0,cash:12000},
+    {d:"02-17",leads:8,spend:1614,mtg:5,sql:5,sm:8,su:0,feR:0,cash:7500},
+    {d:"02-18",leads:7,spend:1601,mtg:5,sql:5,sm:7,su:0,feR:0,cash:19500},
+    {d:"02-19",leads:9,spend:2114,mtg:5,sql:5,sm:5,su:1,feR:60000,cash:15500},
+    {d:"02-20",leads:14,spend:2311,mtg:1,sql:1,sm:2,su:0,feR:0,cash:9000},
+    {d:"02-21",leads:11,spend:1622,mtg:5,sql:5,sm:0,su:0,feR:0,cash:4166},
+    {d:"02-22",leads:7,spend:1517,mtg:3,sql:0,sm:0,su:0,feR:0,cash:0},
+    {d:"02-23",leads:17,spend:1799,mtg:7,sql:7,sm:2,su:1,feR:12000,cash:12997},
+    {d:"02-24",leads:19,spend:1726,mtg:11,sql:11,sm:3,su:0,feR:0,cash:15000},
+    {d:"02-25",leads:10,spend:1565,mtg:3,sql:3,sm:4,su:0,feR:0,cash:0},
+    {d:"02-26",leads:15,spend:1385,mtg:3,sql:3,sm:5,su:1,feR:27000,cash:11000},
+    {d:"02-27",leads:10,spend:1388,mtg:5,sql:4,sm:3,su:1,feR:25000,cash:25000},
+    {d:"02-28",leads:6,spend:1323,mtg:2,sql:2,sm:0,su:0,feR:0,cash:0},
+    {d:"03-01",leads:8,spend:1399,mtg:2,sql:2,sm:0,su:0,feR:0,cash:0},
+    {d:"03-02",leads:9,spend:1640,mtg:6,sql:6,sm:0,su:1,feR:9800,cash:9800},
+    {d:"03-03",leads:21,spend:2056,mtg:6,sql:5,sm:0,su:0,feR:0,cash:0},
+    {d:"03-04",leads:19,spend:2129,mtg:6,sql:5,sm:0,su:0,feR:0,cash:0},
+    {d:"03-05",leads:11,spend:2164,mtg:4,sql:3,sm:0,su:0,feR:0,cash:0},
+  ];
+  MAIN_ROWS      = RAW.filter(r => r.d.startsWith("02"));
+  CUR_MONTH_ROWS = RAW.filter(r => r.d.startsWith("03"));
+  MAIN_MONTH = "Feb"; CUR_MONTH = "Mar";
+  buildDashboard();
+}
+
+// ════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════
+const sm  = (arr,k) => arr.reduce((a,b)=>a+(b[k]||0),0);
+const fd  = v => v>=1e6?`$${(v/1e6).toFixed(2)}M`:v>=1000?`$${(v/1000).toFixed(1)}K`:`$${Math.round(v)}`;
+const fn  = v => v>=1000?`${(v/1000).toFixed(1)}K`:String(Math.round(v));
+const pct = (a,b) => b?((a/b)*100).toFixed(1):"0";
+const chg = (c,p) => p?(((c-p)/p)*100).toFixed(1):"0";
+const dH  = (c,p) => { const v=chg(c,p); const up=parseFloat(v)>=0;
+  return `<span class="${up?'delta-up':'delta-dn'}">${up?'+':''}${v}%</span>`; };
+
+// ════════════════════════════════════════════════════
+// BUILD
+// ════════════════════════════════════════════════════
+function buildDashboard() {
+  const F = { leads:sm(MAIN_ROWS,"leads"), spend:sm(MAIN_ROWS,"spend"), mtg:sm(MAIN_ROWS,"mtg"),
+    sql:sm(MAIN_ROWS,"sql"), sm:sm(MAIN_ROWS,"sm"), su:sm(MAIN_ROWS,"su"),
+    feR:sm(MAIN_ROWS,"feR"), cash:sm(MAIN_ROWS,"cash") };
+  const cpl  = F.leads ? Math.round(F.spend/F.leads) : 0;
+  const roas = F.spend ? (F.feR/F.spend).toFixed(2) : "0";
+  const cL=sm(CUR_MONTH_ROWS,"leads"), cS=sm(CUR_MONTH_ROWS,"spend"),
+        cC=sm(CUR_MONTH_ROWS,"cash"),  cSu=sm(CUR_MONTH_ROWS,"su");
+
+  // Update labels
+  document.getElementById("cash-lbl").textContent    = `Cash Collected vs ${fd(TARGETS.cash)} Target · ${MAIN_MONTH}`;
+  document.getElementById("targets-lbl").textContent  = `${MAIN_MONTH} · vs Monthly Targets`;
+  document.getElementById("daily-lbl").textContent    = `Daily Leads & Ad Spend · ${MAIN_MONTH}`;
+  document.getElementById("weekly-lbl").textContent   = `Weekly Breakdown · ${MAIN_MONTH}`;
+  document.getElementById("footer-source").textContent = `Live · Google Sheets · ${RAW.length} rows · Auto-refresh 5min`;
+
+  buildKPIs(F, cpl, roas);
+  buildFunnel(F);
+  buildCashPanel(F);
+  buildSummary(F, cpl, roas, cL, cS, cC);
+  buildConvTiles(F, cpl, roas);
+  buildTargets(F);
+  buildWeekly();
+  buildCurMonth(cL, cS, cC, cSu);
+  setTimeout(() => { buildChartCash(F); buildChartDaily(); }, 100);
+}
+
+function buildKPIs(F, cpl, roas) {
+  const cards = [
+    {lbl:`Total Leads · ${MAIN_MONTH}`,     val:fn(F.leads),  color:"#38bdf8", delta:dH(F.leads,PREV.leads), sub:`Target ${TARGETS.leads}`, k:"leads"},
+    {lbl:`Meetings · ${MAIN_MONTH}`,        val:fn(F.mtg),    color:"#a78bfa", delta:dH(F.mtg,PREV.mtg),     sub:`Target ${TARGETS.mtg}`,   k:"mtg"},
+    {lbl:`SQLs · ${MAIN_MONTH}`,            val:fn(F.sql),    color:"#22d3ee", delta:dH(F.sql,PREV.sql),     sub:`prev: ${fn(PREV.sql)}`,   k:"sql"},
+    {lbl:`Sales Units · ${MAIN_MONTH}`,     val:F.su,         color:"#4ade80", delta:dH(F.su,PREV.su),       sub:`Target ${TARGETS.su}`,    k:"su"},
+    {lbl:`Ad Spend · ${MAIN_MONTH}`,        val:fd(F.spend),  color:"#fb923c", delta:"",                     sub:`ROAS ${roas}× · CPL ${fd(cpl)}`, k:"spend"},
+  ];
+  document.getElementById("kpi-row").innerHTML = cards.map((c,i)=>`
+    <div class="kpi-card" style="border-top:2px solid ${c.color};animation-delay:${i*60}ms">
+      <div class="kpi-lbl">${c.lbl}</div>
+      <div class="kpi-val" style="color:${c.color}">${c.val}</div>
+      <div class="kpi-sub">${c.sub} ${c.delta}</div>
+      <div class="spark-wrap"><canvas id="spark-${c.k}"></canvas></div>
+    </div>`).join('');
+
+  setTimeout(() => {
+    cards.forEach(c => {
+      if (sparkCharts[c.k]) { sparkCharts[c.k].destroy(); }
+      const canvas = document.getElementById(`spark-${c.k}`);
+      if (!canvas) return;
+      const data = MAIN_ROWS.filter((_,i)=>i%2===0).map(r=>r[c.k]);
+      sparkCharts[c.k] = new Chart(canvas, {
+        type:'line', data:{ labels:data.map((_,i)=>i), datasets:[{
+          data, borderColor:c.color, borderWidth:1.5,
+          fill:true, backgroundColor:`${c.color}18`, tension:.3, pointRadius:0
+        }]},
+        options:{ responsive:true, maintainAspectRatio:false, animation:false,
+          plugins:{legend:{display:false},tooltip:{enabled:false}},
+          scales:{x:{display:false},y:{display:false}} }
+      });
+    });
+  }, 150);
+}
+
+function buildFunnel(F) {
+  const rows=[
+    {lbl:"Leads",          val:F.leads,color:"#1d4ed8",w:100},
+    {lbl:"Meetings Booked",val:F.mtg,  color:"#0891b2",w:parseFloat(pct(F.mtg,F.leads))},
+    {lbl:"SQLs",           val:F.sql,  color:"#0e7490",w:parseFloat(pct(F.sql,F.leads))},
+    {lbl:"SM Done",        val:Math.round(F.sm),color:"#155e75",w:parseFloat(pct(F.sm,F.leads))},
+    {lbl:"Sales (Units)",  val:F.su,   color:"#064e3b",w:parseFloat(pct(F.su,F.leads))},
+  ];
+  document.getElementById("funnel-rows").innerHTML = rows.map(r=>`
+    <div class="funnel-row">
+      <div class="funnel-lbl">${r.lbl}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${r.w}%;background:${r.color}">
+        ${r.w>12?`<span class="funnel-pct">${r.w.toFixed(1)}%</span>`:''}</div></div>
+      <div class="funnel-count">${fn(r.val)}</div>
+    </div>`).join('');
+  document.getElementById("funnel-stats").innerHTML = `
+    <span style="color:#64748b">Overall conv:</span><span style="color:#22d3ee;font-weight:600">${pct(F.su,F.leads)}%</span>
+    <span style="color:#64748b">Lead→Meet:</span><span style="color:#a78bfa">${pct(F.mtg,F.leads)}%</span>
+    <span style="color:#64748b">Meet→SQL:</span><span style="color:#38bdf8">${pct(F.sql,F.mtg)}%</span>`;
+}
+
+function buildCashPanel(F) {
+  document.getElementById("cash-big").textContent = fd(F.cash);
+  document.getElementById("cash-sub").innerHTML = `${pct(F.cash,TARGETS.cash)}% of target ${dH(F.cash,PREV.cash)}`;
+}
+
+function buildSummary(F, cpl, roas, cL, cS, cC) {
+  document.getElementById("summary-body").innerHTML = `
+    <p><strong>Leads: ${F.leads}</strong> in ${MAIN_MONTH} — <span style="color:#34d399">+${chg(F.leads,PREV.leads)}%</span> vs prior.</p>
+    <div class="summary-divider"></div>
+    <p><strong style="color:#a78bfa">Meetings: ${F.mtg}</strong> at ${pct(F.mtg,F.leads)}% conv. <strong>SQLs: ${F.sql}</strong></p>
+    <div class="summary-divider"></div>
+    <p><strong style="color:#4ade80">Sales: ${F.su} units</strong>. FE Rev: <strong style="color:#4ade80">${fd(F.feR)}</strong>. Cash: <strong style="color:#fbbf24">${fd(F.cash)}</strong></p>
+    <div class="summary-divider"></div>
+    <p>Spend: <strong style="color:#fb923c">${fd(F.spend)}</strong>. CPL: <span style="color:#fbbf24">${fd(cpl)}</span>. ROAS: <span style="color:#34d399">${roas}×</span></p>
+    ${CUR_MONTH_ROWS.length>0?`<div class="summary-divider"></div>
+    <p>🗓 ${CUR_MONTH} (${CUR_MONTH_ROWS.length}d): <strong style="color:#38bdf8">${cL} leads</strong> · <strong style="color:#fb923c">${fd(cS)}</strong> · <strong style="color:#4ade80">${fd(cC)}</strong></p>`:''}`;
+}
+
+function buildConvTiles(F, cpl, roas) {
+  const tiles=[
+    {lbl:"Visitor-to-Contact Rate",val:`${pct(F.mtg,F.leads)}%`,sub:`prev: ${pct(PREV.mtg,PREV.leads)}%`,up:parseFloat(pct(F.mtg,F.leads))>=parseFloat(pct(PREV.mtg,PREV.leads)),color:"#38bdf8"},
+    {lbl:"Contact-to-SQL",val:fn(F.sql),sub:`prev: ${fn(PREV.sql)}`,up:F.sql>=PREV.sql,color:"#a78bfa"},
+    {lbl:"Contact-to-MOL",val:`${(F.mtg/Math.max(F.leads,1)*10).toFixed(1)}`,sub:"Meetings/Leads ×10",up:true,color:"#fb923c"},
+    {lbl:"Cost Per Lead",val:fd(cpl),sub:`ROAS: ${roas}×`,up:cpl<=Math.round(PREV.spend/PREV.leads),color:"#fbbf24"},
+  ];
+  document.getElementById("conv-row").innerHTML = tiles.map(t=>`
+    <div class="panel">
+      <div class="lbl">${MAIN_MONTH} · ${t.lbl}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:26px;color:#e2e8f0;line-height:1">${t.val}</div>
+        <div style="font-size:9px;font-family:monospace;color:${t.up?'#34d399':'#f87171'}">${t.up?'▲':'▼'} ${t.sub}</div>
+      </div>
+    </div>`).join('');
+}
+
+function progBar(lbl,actual,target,color) {
+  const p=Math.min(Math.round(actual/target*100),100), over=actual>=target, bc=over?"#34d399":color;
+  return `<div class="prog-item">
+    <div class="prog-header">
+      <span style="color:#94a3b8">${lbl}</span>
+      <span style="font-family:monospace;font-size:10px">
+        <span style="color:#e2e8f0">${actual>999?fd(actual):actual}</span>
+        <span style="color:#3d5f7a"> / ${target>999?fd(target):target}</span>
+        <span style="color:${bc};margin-left:6px">${p}%</span>
+      </span>
+    </div>
+    <div class="prog-track"><div class="prog-fill" style="width:${p}%;background:${bc}"></div></div>
+  </div>`;
+}
+function buildTargets(F) {
+  document.getElementById("targets-row").innerHTML = [
+    progBar("Leads",F.leads,TARGETS.leads,"#38bdf8"),
+    progBar("Meetings",F.mtg,TARGETS.mtg,"#a78bfa"),
+    progBar("Sales Units",F.su,TARGETS.su,"#4ade80"),
+    progBar("Cash Collected",F.cash,TARGETS.cash,"#fbbf24"),
+    progBar("FE Revenue",F.feR,TARGETS.feR,"#fb923c"),
+    progBar("Ad Spend",F.spend,TARGETS.spend,"#f87171"),
+  ].join('');
+}
+
+function buildWeekly() {
+  const wks={};
+  MAIN_ROWS.forEach(r=>{
+    const [,dd]=r.d.split("-").map(Number);
+    const wn = Math.ceil(dd/7);
+    const k=`Wk${wn}`;
+    if(!wks[k])wks[k]={w:k,leads:0,spend:0,cash:0,su:0};
+    wks[k].leads+=r.leads;wks[k].spend+=r.spend;wks[k].cash+=r.cash;wks[k].su+=r.su;
+  });
+  document.getElementById("weekly-body").innerHTML = Object.values(wks).map(w=>`
+    <tr>
+      <td style="color:#38bdf8;font-family:monospace;font-size:10px">${w.w}</td>
+      <td style="color:#94a3b8">${w.leads}</td>
+      <td style="font-family:monospace;color:#fb923c">${fd(w.spend)}</td>
+      <td style="font-family:monospace;color:${w.cash>0?'#4ade80':'#3d5f7a'}">${fd(w.cash)}</td>
+      <td style="color:#94a3b8">${w.su}</td>
+    </tr>`).join('');
+}
+
+function buildCurMonth(cL, cS, cC, cSu) {
+  const sec = document.getElementById("cur-month-section");
+  if (CUR_MONTH_ROWS.length === 0) { sec.style.display="none"; return; }
+  sec.style.display = "block";
+  document.getElementById("cur-month-lbl").textContent = `${CUR_MONTH} (${CUR_MONTH_ROWS.length} days)`;
+  document.getElementById("cur-mini").innerHTML = [
+    {k:"Leads",v:cL,c:"#38bdf8"},{k:"Spend",v:fd(cS),c:"#fb923c"},
+    {k:"Sales",v:cSu,c:"#4ade80"},{k:"Cash",v:fd(cC),c:"#fbbf24"},
+  ].map(i=>`<div class="mini-card"><div class="mini-card-lbl">${i.k}</div>
+    <div class="mini-card-val" style="color:${i.c}">${typeof i.v==="number"?fn(i.v):i.v}</div></div>`).join('');
+}
+
+function buildChartCash(F) {
+  if (chartCash) chartCash.destroy();
+  const ctx = document.getElementById("chart-cash");
+  if (!ctx) return;
+  let cum=0;
+  const cumArr = MAIN_ROWS.map(r=>{ cum+=r.cash; return cum; });
+  chartCash = new Chart(ctx, {
+    data:{ labels:MAIN_ROWS.map(r=>r.d), datasets:[
+      {type:"bar",label:"Daily Cash",data:MAIN_ROWS.map(r=>r.cash),backgroundColor:"rgba(29,78,216,0.55)",borderRadius:2,yAxisID:"y",order:2},
+      {type:"line",label:"Cumulative",data:cumArr,borderColor:"#fbbf24",borderWidth:2.5,pointRadius:0,fill:true,backgroundColor:"rgba(251,191,36,0.08)",tension:.3,yAxisID:"y2",order:1},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:"#0f1c2e",borderColor:"#1e3a5f",borderWidth:1,titleColor:"#64748b",bodyColor:"#e2e8f0",callbacks:{label:c=>` ${fd(c.parsed.y)}`}}},
+      scales:{
+        x:{ticks:{color:"#2d4a62",font:{size:8,family:"monospace"},maxTicksLimit:10},grid:{color:"#0f1c2e"},border:{display:false}},
+        y:{ticks:{color:"#2d4a62",font:{size:8,family:"monospace"},callback:v=>fd(v)},grid:{color:"#1a3050",lineWidth:.5},border:{display:false},position:"left"},
+        y2:{ticks:{color:"#2d4a62",font:{size:8,family:"monospace"},callback:v=>fd(v)},grid:{display:false},border:{display:false},position:"right"},
+      }
+    }
+  });
+}
+
+function buildChartDaily() {
+  if (chartDaily) chartDaily.destroy();
+  const ctx = document.getElementById("chart-daily");
+  if (!ctx) return;
+  chartDaily = new Chart(ctx, {
+    data:{ labels:MAIN_ROWS.map(r=>r.d), datasets:[
+      {type:"bar",label:"Ad Spend",data:MAIN_ROWS.map(r=>r.spend),backgroundColor:"rgba(251,146,60,0.5)",borderRadius:2,yAxisID:"y2",order:3},
+      {type:"line",label:"Leads",data:MAIN_ROWS.map(r=>r.leads),borderColor:"#38bdf8",borderWidth:2,pointRadius:0,fill:true,backgroundColor:"rgba(56,189,248,0.07)",tension:.3,yAxisID:"y",order:1},
+      {type:"line",label:"Meetings",data:MAIN_ROWS.map(r=>r.mtg),borderColor:"#a78bfa",borderWidth:1.5,pointRadius:0,borderDash:[3,2],tension:.3,yAxisID:"y",order:2},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:true,labels:{color:"#3d5f7a",font:{size:9,family:"monospace"},boxWidth:10,padding:12}},tooltip:{backgroundColor:"#0f1c2e",borderColor:"#1e3a5f",borderWidth:1,titleColor:"#64748b",bodyColor:"#e2e8f0"}},
+      scales:{
+        x:{ticks:{color:"#2d4a62",font:{size:8,family:"monospace"},maxTicksLimit:8},grid:{color:"#0f1c2e"},border:{display:false}},
+        y:{ticks:{color:"#2d4a62",font:{size:8,family:"monospace"}},grid:{color:"#1a3050",lineWidth:.5},border:{display:false},position:"left"},
+        y2:{ticks:{color:"#2d4a62",font:{size:8,family:"monospace"},callback:v=>fd(v)},grid:{display:false},border:{display:false},position:"right"},
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
