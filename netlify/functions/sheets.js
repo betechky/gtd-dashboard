@@ -13,9 +13,26 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    const SHEET_ID    = process.env.SHEET_ID;
+    const SHEET_ID     = process.env.SHEET_ID;
     const CLIENT_EMAIL = process.env.SA_EMAIL;
-    const PRIVATE_KEY  = (process.env.SA_KEY || "").replace(/\\n/g, "\n");
+
+    // Handle all possible key formats Netlify might store
+    let PRIVATE_KEY = (process.env.SA_KEY || "");
+    // Replace literal \n with actual newlines
+    PRIVATE_KEY = PRIVATE_KEY.replace(/\\n/g, "\n");
+    // If key has no newlines at all, reformat it properly
+    if (!PRIVATE_KEY.includes("\n")) {
+      PRIVATE_KEY = PRIVATE_KEY
+        .replace("-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY-----\n")
+        .replace("-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----\n");
+      // Add newlines every 64 chars in the base64 body
+      const lines = PRIVATE_KEY.split("\n");
+      const rebuilt = lines.map(line => {
+        if (line.startsWith("-----")) return line;
+        return line.match(/.{1,64}/g).join("\n");
+      });
+      PRIVATE_KEY = rebuilt.join("\n");
+    }
 
     if (!SHEET_ID || !CLIENT_EMAIL || !PRIVATE_KEY) {
       return { statusCode: 500, headers: CORS,
